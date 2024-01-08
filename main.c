@@ -9,6 +9,11 @@ extern void _load_le(unsigned char* dst, unsigned char* src, unsigned long long 
 extern void _prime_prng_fix(unsigned char* buf, unsigned long long sz);
 extern void _bigmul(unsigned char* dst, unsigned char* op1, unsigned char* op2, unsigned long long sz);
 extern int _bigcmp(unsigned char* op1, unsigned char* op2, unsigned long long sz);
+extern void __bigneg(unsigned char* op1, unsigned long long sz);
+extern void __bigpos(unsigned char* op1, unsigned long long sz);
+extern void _bigmod(unsigned char* op1dst, unsigned char* op2, unsigned long long sz);
+extern void __bigmul2(unsigned char* op1dst, unsigned long long sz);
+
 #define BigAdd(dst, op1,op2, bit_sz) _bigadd(dst, op1, op2, bit_sz / 8)
 
 void print_block(unsigned char* b){
@@ -30,35 +35,34 @@ int main(){
     // print_block(buf + 32);
     // print_block(buf + 64);
     // print_block(buf + 96);
-    unsigned char b1[32];
-    unsigned char b2[32];
-    unsigned char dst[32];
-    // _aes_prng(seed256, b1, 32);
-    // _aes_prng(seed256, b2, 32);
+    unsigned char b1[64];
+    unsigned char b2[64];
+    unsigned char dst[64];
+    _aes_prng(seed256, b1, 64);
+    _aes_prng(seed256, b2, 64);
     memset(b1, 0, 32);
-    memset(b2, 0, 32);
-    // b1[31] = 11;
-    // b2[31] = 10;
+    memset(b2, 0, 48);
+    // memcpy(b2 + 32, b1+32, 32);
+    // b1[63] = 173;
+    // b2[63] = 3;
 
-    printf("Blocks before prng fix conversion\n");
+    printf("Block 1\n");
     print_block(b1);
+    print_block(b1 + 32);
+
+    printf("Block 2\n");
     print_block(b2);
-    // _prime_prng_fix(b1, 32);
-    // _prime_prng_fix(b2, 32);
-    // printf("Blocks after prng fix conversion\n");
-    // print_block(b1);
-    // print_block(b2);
-    _store_le(b1, b1, 32);
-    _store_le(b2, b2, 32);
-    switch (_bigcmp(b1, b2, 32)){
-        case 0: printf("First operand is bigger\n");break;
-        case 1: printf("Second operand is bigger\n");break;
-        case 2: printf("Equal\n");break;
-    }
-    memset(dst, 0, 32);
-    // _bigmul(dst, b1, b2, 64);
-    // _load_le(dst, dst, 64);
-    // printf("Mul is:\n");
-    // print_block(dst);print_block(dst + 32);
+    print_block(b2 + 32);
+
+    _store_le(b1, b1, 64);
+    _store_le(b2, b2, 64);
+    // memset(dst, 0, 64);
+
+    _bigmod(b1, b2, 64);
+    // __bigmul2(b1, 64);
+    _load_le(b1, b1, 64);
+    printf("Add is:\n");
+    print_block(b1);
+    print_block(b1 + 32);
     return 0;
 }

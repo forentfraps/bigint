@@ -7,12 +7,18 @@ global _load_le
 global _prime_prng_fix
 global _bigmul
 global _bigcmp
+global _bigmod
+
+global __bigmul2
+
 section .text
     _load_le:
     _store_le:
     ; rcx - dst
     ; rdx - src
     ; r8 - byte size divisible by 8
+
+    ;Clobbers rax, r9
         xor r9, r9
     _store_le_cycle:
         cmp r8, r9
@@ -105,6 +111,7 @@ section .text
         push rbx
         mov rbp, rsp
         sub rsp, 24
+
         mov [rsp], rcx ; dst
         mov [rsp + 8], rdx ; op1
         mov rsi, r8 ; op2
@@ -135,6 +142,7 @@ _bigmul_inner_continue:
     _bigmul_inner_end:
         add r10, 8
         jmp _bigmul_outer_cycle
+
     _bigmul_end:
         add rsp, 24
         pop rbx
@@ -170,3 +178,155 @@ _bigmul_inner_continue:
     _bigcmp_end:
         ret
 
+    __bigmul2:
+    ;rcx - op1/dst
+    ;r8 - sz
+
+    ;Clobbers rax, r9, r10,r11
+        xor r11, r11
+        xor r10, r10
+        ; mov r9, rdx
+        mov r9, r8
+    __bigmul2_cycle:
+        test r9, r9
+        jz __bigmul2_end
+        sub r9, 8
+        mov rax, [rcx + r9]
+        shl rax, 1
+        setc r10b
+        or al, r11b
+        mov r11b, r10b
+        mov [rcx + r9], rax
+        jmp __bigmul2_cycle
+    __bigmul2_end:
+        ret
+
+    __bigneg:
+    ;rcx - op1
+    ;r8 - sz
+
+    ;Clobbers rax, r9, r11
+        mov r9, r8
+        xor r11, r11
+        mov r11b, 1
+    __bigneg_cycle:
+        test r9, r9
+        jz __bigneg_end
+        sub r9, 8
+        mov rax, [rcx + r9]
+        not rax
+        add rax, r11
+        setc r11b
+        mov [rcx + r9], rax
+        jmp __bigneg_cycle
+    __bigneg_end:
+        xor rax, rax
+        ret
+
+    __bigpos:
+    ;rcx - op1
+    ;r8 - sz
+
+    ;Clobbers rax, r9, r10, r11
+        mov r9, r8
+        or r10, -1
+        xor r11, r11
+    __bigpos_cycle:
+        test r9, r9
+        jz __bigpos_end
+        sub r9, 8
+        mov rax, [rcx + r9]
+        test r11b, r11b
+        jz __bigpos_nc
+        stc
+    __bigpos_nc:
+        adc rax, r10
+        setc r11b
+        not rax
+        mov [rcx + r9], rax
+        jmp __bigpos_cycle
+    __bigpos_end:
+        xor rax, rax
+        ret
+
+
+    _bigmod:
+    ; op1 % op2
+    ;rcx - op1
+    ;rdx - op2
+    ;r8 - sz in bytes, divisible by 8
+
+    ;Clobbers all scratch (rax, rcx, rdx, r8, r9, r10, r11)
+        push rbp
+        push rsi
+        push rdi
+        push rbx
+        mov rbp, rsp
+        sub rsp, r8
+        mov rbx, rsp
+        sub rsp, r8
+        sub rsp, 24
+        mov [rsp], r8; sz
+        mov [rsp + 8], rcx ; op1
+        mov [rsp + 16], rdx ; op2
+        ;[rsp + 24] - sz sized buffer for M
+        ;rbx - sz sized buffer for M * 2
+        jmp _bigmod_init_cycle
+    _bigmod_cycle:
+        mov r8, [rsp]
+    ;check a < b if yes, jump to end 
+        mov rcx, [rsp + 8]
+        mov rdx, [rsp + 16]
+    _bigmod_init_cycle:
+        call _bigcmp
+        cmp eax, 1
+        jz _bigmod_end
+    ;populate storage for m (rsp + 24)
+        mov rsi, rdx
+        lea rdi, [rsp + 24]
+        mov rcx, r8
+        shr rcx, 3
+        rep movsq
+    ;populate storage for m * 2 (rbx)
+        mov rsi, rdx
+        mov rdi, rbx
+        mov rcx, r8
+        shr rcx, 3
+        rep movsq
+        mov rcx, rbx
+    ;mul2 storage for m*2
+    _bigmod_m2mul:
+        mov rcx, rbx
+        call __bigmul2
+    ;compare m*2 with a, if bigger work with m
+        mov rdx, [rsp + 8]
+        call _bigcmp
+        test eax, eax
+        jz _bigmod_sub
+    ;if less, mov m*2 to m, jmp back to repeat until succeeds
+        mov rsi, rbx
+        lea rdi, [rsp + 24]
+        mov rcx, r8
+        shr rcx, 3
+        rep movsq
+        jmp _bigmod_m2mul
+    ;substraction part
+    _bigmod_sub:
+    ;convert m to negative and add to a
+        lea rcx, [rsp + 24]
+        call __bigneg
+        mov rcx, [rsp + 8]
+        mov rdx, rcx
+        mov r9, r8
+        lea r8, [rsp + 24]
+        call _bigadd
+        jmp _bigmod_cycle
+    _bigmod_end:
+        pop rax
+        lea rsp, [rsp + 2 * rax]
+        add rsp, 16
+        pop rbx
+        pop rdi
+        pop rsi
+        pop rbp
+        ret
