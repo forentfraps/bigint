@@ -10,6 +10,7 @@ global _bigcmp
 global _bigmod
 
 global __bigmul2
+global __bigdiv2
 
 section .text
     _load_le:
@@ -33,6 +34,8 @@ section .text
 
     _seed256:
     ; rcx - buffer to store 256 bits of randomness from the CPU
+
+    ;Clobbers rax
         rdseed rax
         mov [rcx], rax
         rdseed rax
@@ -201,6 +204,31 @@ _bigmul_inner_continue:
     __bigmul2_end:
         ret
 
+    __bigdiv2:
+    ;rcx - op1/dst
+    ;r8 - sz
+
+    ;Clobbers rax, r9, r10,r11
+        xor r11, r11
+        xor r10, r10
+        xor r9, r9
+    __bigdiv2_cycle:
+        cmp r9, r8
+        ; cmp r9, rdx
+        jz __bigdiv2_end
+        mov rax, [rcx + r9]
+        shr rax, 1
+        setc r10b
+        shl r11, 63
+        or rax, r11
+        xor r11, r11
+        mov r11b, r10b
+        mov [rcx + r9], rax
+        add r9, 8
+        jmp __bigdiv2_cycle
+    __bigdiv2_end:
+        ret
+
     __bigneg:
     ;rcx - op1
     ;r8 - sz
@@ -250,7 +278,7 @@ _bigmul_inner_continue:
         ret
 
 
-    _bigmod:
+_bigmod:
     ; op1 % op2
     ;rcx - op1
     ;rdx - op2
@@ -260,10 +288,7 @@ _bigmul_inner_continue:
         push rbp
         push rsi
         push rdi
-        push rbx
         mov rbp, rsp
-        sub rsp, r8
-        mov rbx, rsp
         sub rsp, r8
         sub rsp, 24
         mov [rsp], r8; sz
@@ -287,33 +312,22 @@ _bigmul_inner_continue:
         mov rcx, r8
         shr rcx, 3
         rep movsq
-    ;populate storage for m * 2 (rbx)
-        mov rsi, rdx
-        mov rdi, rbx
-        mov rcx, r8
-        shr rcx, 3
-        rep movsq
-        mov rcx, rbx
     ;mul2 storage for m*2
+        lea rcx, [rsp + 24]
+        mov rdx, [rsp + 8]
     _bigmod_m2mul:
-        mov rcx, rbx
         call __bigmul2
     ;compare m*2 with a, if bigger work with m
-        mov rdx, [rsp + 8]
+
         call _bigcmp
         test eax, eax
         jz _bigmod_sub
-    ;if less, mov m*2 to m, jmp back to repeat until succeeds
-        mov rsi, rbx
-        lea rdi, [rsp + 24]
-        mov rcx, r8
-        shr rcx, 3
-        rep movsq
         jmp _bigmod_m2mul
     ;substraction part
     _bigmod_sub:
     ;convert m to negative and add to a
-        lea rcx, [rsp + 24]
+        ; lea rcx, [rsp + 24]
+        call __bigdiv2
         call __bigneg
         mov rcx, [rsp + 8]
         mov rdx, rcx
@@ -323,9 +337,7 @@ _bigmul_inner_continue:
         jmp _bigmod_cycle
     _bigmod_end:
         pop rax
-        lea rsp, [rsp + 2 * rax]
-        add rsp, 16
-        pop rbx
+        lea rsp, [rsp + rax + 16]
         pop rdi
         pop rsi
         pop rbp
