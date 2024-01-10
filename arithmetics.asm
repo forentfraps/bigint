@@ -8,13 +8,15 @@ global _prime_prng_fix
 global _bigmul
 global _bigcmp
 global _bigmod
+global _bigdivmod
+
 
 global __bigmul2
 global __bigdiv2
 
 section .text
-    _load_le:
-    _store_le:
+_load_le:
+_store_le:
     ; rcx - dst
     ; rdx - src
     ; r8 - byte size divisible by 8
@@ -32,7 +34,7 @@ section .text
     _store_le_cycle_end:
         ret
 
-    _seed256:
+_seed256:
     ; rcx - buffer to store 256 bits of randomness from the CPU
 
     ;Clobbers rax
@@ -46,7 +48,7 @@ section .text
         mov [rcx + 24], rax
         ret
 
-    _aes_prng:
+_aes_prng:
     ; rcx - state/seed
     ; rdx - ptr to store random
     ; r8 - bytes len, divisibly by 16
@@ -66,7 +68,7 @@ section .text
         movups [rcx], xmm1
         ret
 
-    _prime_prng_fix:
+_prime_prng_fix:
     ;rcx - buffer
     ;rdx - size
         or byte[rcx], 0x80
@@ -74,7 +76,7 @@ section .text
         or byte [rcx + rdx], 1
         ret
 
-    _bigadd:
+_bigadd:
     ;rcx - dst
     ;rdx - op1
     ;r8 - op2
@@ -101,7 +103,7 @@ section .text
         mov al, r11b
         ret
 
-    _bigmul:
+_bigmul:
     ;rcx - dst
     ;rdx - op1
     ;r8 - op2
@@ -134,7 +136,7 @@ section .text
         call _bigadd
         shl rbx, 1
         jc _bigmul_add_case
-_bigmul_inner_continue:
+    _bigmul_inner_continue:
         inc rdi
         jmp _bigmul_inner_cycle
     _bigmul_add_case:
@@ -154,8 +156,39 @@ _bigmul_inner_continue:
         pop rbp
         ret
 
+_bigadd2n:
+    ;rcx - dst, op1
+    ;rdx - 2 ^ op2
+    ;r8 - sz
 
-    _bigcmp:
+    ;Clobbers rax, r9, r10, r11
+        mov r9, rdx
+        mov r10, r8
+        shr r9, 6
+        shl r9, 3
+        sub r10, r9
+        mov r9, r10
+        mov rax, rcx
+        mov rcx, rdx
+        and rcx, 0x3f
+        mov r10, 1
+        shl r10, cl ;for some reason only cl is permitted
+        mov rcx, rax
+        xor rax, rax
+    _bigadd2n_cycle:
+        sub r9, 8
+        add r10, [rcx + r9]
+        setc al
+        mov [rcx + r9], r10
+        mov r10, rax
+        test r9, r9
+        jnz _bigadd2n_cycle
+    _bigadd2n_end:
+        ret
+
+
+
+_bigcmp:
     ;rcx - op1
     ;rdx - op2
     ;r8 - sz in bytes, divisible by 8
@@ -181,7 +214,7 @@ _bigmul_inner_continue:
     _bigcmp_end:
         ret
 
-    __bigmul2:
+__bigmul2:
     ;rcx - op1/dst
     ;r8 - sz
 
@@ -204,7 +237,7 @@ _bigmul_inner_continue:
     __bigmul2_end:
         ret
 
-    __bigdiv2:
+__bigdiv2:
     ;rcx - op1/dst
     ;r8 - sz
 
@@ -229,7 +262,7 @@ _bigmul_inner_continue:
     __bigdiv2_end:
         ret
 
-    __bigneg:
+__bigneg:
     ;rcx - op1
     ;r8 - sz
 
@@ -251,7 +284,7 @@ _bigmul_inner_continue:
         xor rax, rax
         ret
 
-    __bigpos:
+__bigpos:
     ;rcx - op1
     ;r8 - sz
 
@@ -340,5 +373,109 @@ _bigmod:
         lea rsp, [rsp + rax + 16]
         pop rdi
         pop rsi
+        pop rbp
+        ret
+
+_bigadd64:
+    ;rcx - dst op1
+    ;rdx - imm64
+    ;r8 - sz
+
+    ;Clobbers rax, rdx, r9
+        xor rax, rax
+        mov r9, r8
+    _bigadd64_cycle:
+        test r9, r9
+        jz _bigadd64_end
+        sub r9, 8
+        add rdx, [rcx + r9]
+        setc al
+        mov [rcx + r9], rdx
+        mov rdx, rax
+        jmp _bigadd64_cycle
+    _bigadd64_end:
+        ret
+
+_bigdivmod:
+    ;rcx - quotient dst
+    ;rdx - remainder dst
+    ;r8 - op1
+    ;r9 - op2
+    ;[rsp - 8] - sz
+
+        mov rax, [rsp + 40]
+        push rbp
+        push rdi
+        push rsi
+        mov rbp, rsp
+        sub rsp, rax
+        sub rsp, 40
+        mov [rsp], rax      ; sz
+        mov [rsp + 8], rcx  ; q
+        mov [rsp + 16], rdx ; r
+        mov [rsp + 24], r8  ; a
+        mov [rsp + 32], r9  ; b
+                ; rsp + 40  ; m
+        xor r11, r11
+    ;zero the quotient
+    _bigdivmod_prereq:
+        test rax, rax
+        jz _bigdivmod_prereq2
+        sub rax, 8
+        mov [rcx + rax], r11
+        jmp _bigdivmod_prereq
+    _bigdivmod_prereq2:
+    ;populate remainder with a
+        mov rsi, r8
+        mov rdi, [rsp + 16]
+        mov rcx, [rsp]
+        shr rcx, 3
+        rep movsq
+    _bigdivmod_cycle:
+    ;compare remainder with b, if smaller jmp to end
+        mov rcx, [rsp + 16]
+        mov rdx, [rsp + 32]
+        mov r8, [rsp]
+        call _bigcmp
+        test eax, eax
+        jnz _bigdivmod_end
+    ;populate m with b
+        mov rsi, rdx
+        lea rdi, [rsp + 40]
+        mov rcx, r8
+        shr rcx, 3
+        rep movsq
+    ;multiplying m until it is bigger than a, storing partial
+    ;quotient in rdi
+        xor rdi, rdi
+        lea rcx, [rsp + 40]
+        mov rdx, [rsp + 16]
+    _bigdivmod_mul2:
+        call _bigcmp
+        test eax, eax
+        jz _bigdivmod_sub
+        inc rdi
+        call __bigmul2
+        jmp _bigdivmod_mul2
+    _bigdivmod_sub:
+    ;divide m * 2 so its smaller than a by just enough
+    ; add the partial q and substract from the r
+        dec rdi
+        call __bigdiv2
+        call __bigneg
+        mov rcx, [rsp + 8]
+        mov rdx, rdi
+        call _bigadd2n
+        mov rcx, [rsp + 16]
+        lea rdx, [rsp + 40]
+        mov r9, r8
+        mov r8, rcx
+        call _bigadd
+        jmp _bigdivmod_cycle
+    _bigdivmod_end:
+        pop rax
+        lea rsp, [rsp + rax + 32]
+        pop rsi
+        pop rdi
         pop rbp
         ret

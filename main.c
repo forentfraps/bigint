@@ -12,8 +12,12 @@ extern int _bigcmp(unsigned char* op1, unsigned char* op2, unsigned long long sz
 extern void __bigneg(unsigned char* op1, unsigned long long sz);
 extern void __bigpos(unsigned char* op1, unsigned long long sz);
 extern void _bigmod(unsigned char* op1dst, unsigned char* op2, unsigned long long sz);
-extern void __bigmul2(unsigned char* op1dst, unsigned long long sz);
-extern void __bigdiv2(unsigned char* op1dst, unsigned long long sz);
+extern void _bigdivmod(unsigned char* q, unsigned char* r, unsigned char* op1, unsigned char* op2, unsigned long long sz);
+
+
+// extern void __bigmul2(unsigned char* op1dst, unsigned long long sz);
+// extern void __bigdiv2(unsigned char* op1dst, unsigned long long sz);
+
 
 #define BigAdd(dst, op1,op2, bit_sz) _bigadd(dst, op1, op2, bit_sz / 8)
 
@@ -37,11 +41,11 @@ int main(){
     _aes_prng(seed256, b1, 64);
     _aes_prng(seed256, b2, 64);
     _aes_prng(seed256, n, 64);
-    // memset(b1, 0, 43);
+    // memset(b1, 0, 64);
     memset(b2, 0, 32);
     // memcpy(b2 + 32, b1+32, 32);
     // b1[63] = 173;
-    // b2[63] = 3;
+    // b2[63] = 31;
 
     printf("Block 1\n");
     print_block(b1);
@@ -55,11 +59,16 @@ int main(){
     _store_le(b2, b2, 64);
     // memset(dst, 0, 64);
     // __bigdiv2(b1, 64);
-    _bigmod(b1, b2, 64);
+    // _bigmod(b1, b2, 64);
+    _bigdivmod(n, dst, b1, b2, 64);
 
-    _load_le(b1, b1, 64);
-    printf("Add is:\n");
-    print_block(b1);
-    print_block(b1 + 32);
+    _load_le(n, n, 64);
+    _load_le(dst, dst, 64);
+    printf("q is:\n");
+    print_block(n);
+    print_block(n + 32);
+    printf("r is:\n");
+    print_block(dst);
+    print_block(dst + 32);
     return 0;
 }
