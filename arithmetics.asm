@@ -9,10 +9,8 @@ global _bigmul
 global _bigcmp
 global _bigmod
 global _bigdivmod
-
-
-global __bigmul2
-global __bigdiv2
+global _bigneg_c
+global _bigzero
 
 section .text
 _load_le:
@@ -104,6 +102,7 @@ _bigadd:
         ret
 
 _bigmul:
+    ;NB! DST MUST BE ZEROED PRIOR
     ;rcx - dst
     ;rdx - op1
     ;r8 - op2
@@ -262,6 +261,9 @@ __bigdiv2:
     __bigdiv2_end:
         ret
 
+
+_bigneg_c:
+        mov r8, rdx
 __bigneg:
     ;rcx - op1
     ;r8 - sz
@@ -437,8 +439,8 @@ _bigdivmod:
         mov rdx, [rsp + 32]
         mov r8, [rsp]
         call _bigcmp
-        test eax, eax
-        jnz _bigdivmod_end
+        cmp eax, 1
+        jz _bigdivmod_end
     ;populate m with b
         mov rsi, rdx
         lea rdi, [rsp + 40]
@@ -478,4 +480,17 @@ _bigdivmod:
         pop rsi
         pop rdi
         pop rbp
+        ret
+
+_bigzero:
+    ;rcx - dst
+    ;rdx - sz
+        xor rax, rax
+    _bigzero_cycle:
+        test rdx, rdx
+        jz _bigzero_end
+        sub rdx, 8
+        mov [rcx + rdx], rax
+        jmp _bigzero_cycle
+    _bigzero_end:
         ret
