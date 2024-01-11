@@ -56,10 +56,34 @@ def gcdExtended(a, b):
     y = x1
 
     return gcd,x,y
+
+class MontgomeryNumber:
+    def __init__(self, value, modulus):
+        self.value = value
+        self.modulus = modulus
+        self.R = 2**256  # R is a power of 2 just larger than modulus
+        self.Rinv = pow(self.R, -1, modulus)  # Modular inverse of R modulo N
+        self.Nprime = -pow(modulus, -1, self.R) % self.R  # -N^-1 mod R
+
+        # Convert value to Montgomery form
+        self.montgomery_value = (self.value * self.R) % self.modulus
+
+    def __str__(self):
+        return (f"Value: {hex(self.value)}\n"
+                f"Montgomery Value: {hex(self.montgomery_value)}\n"
+                f"Modulus: {hex(self.modulus)}\n"
+                f"R: {hex(self.R)}\n"
+                f"Rinv: {hex(self.Rinv)}\n"
+                f"Nprime: {hex(self.Nprime)}")
+
+# Example usage
+montgomery_number = MontgomeryNumber(251, 131)
+print(montgomery_number)
+
 # Driver code
-a = 0x57e8fa0952c6cc76ef6c4ce9d3458852348b996a31a5af158c0f2f8ab026eb31
-b = 0x7d4579e9545cdbeec8371b03ac12b6861e261a8a373fb88dab547860cf71d5e5
-g, x, y = gcdExtended(b, a) 
-print(hex(x))
-print(hex(y % 2**512))
+# a = 0x57e8fa0952c6cc76ef6c4ce9d3458852348b996a31a5af158c0f2f8ab026eb31
+# b = 0x7d4579e9545cdbeec8371b03ac12b6861e261a8a373fb88dab547860cf71d5e5
+# g, x, y = gcdExtended(b, a) 
+# print(hex(x))
+# print(hex(y % 2**512))
 # print(generate_prime_number(2048))

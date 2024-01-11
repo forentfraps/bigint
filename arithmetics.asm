@@ -11,7 +11,7 @@ global _bigmod
 global _bigdivmod
 global _bigneg_c
 global _bigzero
-
+global _bigadd2n
 section .text
 _load_le:
 _store_le:

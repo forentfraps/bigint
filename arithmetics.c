@@ -22,8 +22,6 @@ int GCDE(unsigned char* a, unsigned char* b, unsigned char* ptr_x, unsigned char
     unsigned char q[sz];
     unsigned char r[sz];
     _bigzero(q, sz);
-    // _bigzero(r, sz);
-
     if (_bigcmp(q, b, sz) == 2){
         q[sz - 8] = 1;
 
@@ -36,24 +34,58 @@ int GCDE(unsigned char* a, unsigned char* b, unsigned char* ptr_x, unsigned char
         return 0;
     }
     _bigdivmod(q, r, a, b, sz);
-    // printf("q\n");
-    // pbl(q);
-    // printf("r\n");
-    // pbl(r);
     gcd = GCDE(b, r, x1, y1, sz);
     if (gcd){
         return 1;
     }
-/*
-    _bigmul(x1, x1, q, sz);
-    _bigneg_c(x1, sz);
-    _bigadd(ptr_x, y1, x1, sz);
-    memcpy(ptr_y, x1, sz);
-*/
     _bigzero(ptr_y, sz);
     memcpy(ptr_x, y1, sz);
     _bigmul(ptr_y, y1, q, sz);
     _bigneg_c(ptr_y, sz);
     _bigadd(ptr_y, x1, ptr_y, sz);
     return gcd;
+}
+
+int ModInverse(unsigned char* a, unsigned char* b, unsigned char* ptr_x, size_t sz){
+    int gcd;
+    unsigned char ptr_y[sz];
+    if (GCDE(a, b, ptr_x, ptr_y, sz) == 0){
+        if (ptr_x[0] == 0xff){
+            _bigadd(ptr_x, ptr_x, b, sz);
+        }
+        return 0;
+    }
+    return 1;
+}
+
+/*
+typedef struct {
+    unsigned char* value;
+    unsigned char* modulus;
+    unsigned char* mval;
+    unsigned char* R;
+    unsigned char* Rinv;
+    unsigned char* Ninv;
+    size_t length;
+} MNTG;
+*/
+
+
+
+
+int MNTG_in(MNTG* in){
+    unsigned char* R = in->R;
+    size_t sz = in->length;
+    BIG_alloc(rmodn, sz);
+    _bigzero(rmodn, sz);
+    _bigadd2n(rmodn, sz * 4, sz);
+    memcpy(R, rmodn, sz);
+    _bigmod(rmodn, in->modulus, sz);
+    ModInverse(rmodn, in->modulus, in->Rinv, sz);
+    ModInverse(in->modulus, R, in->Ninv, sz);
+    _bigneg_c(in->Ninv, sz);
+    _bigadd(in->Ninv, in->Ninv, R, sz);
+    _bigzero(in->mval, sz);
+    _bigmul(in->mval, rmodn, in->value, sz);
+    _bigmod(in->mval, in->modulus, sz);
 }
