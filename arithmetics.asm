@@ -81,7 +81,7 @@ _prime_prng_fix:
         sub rdx, 1
         or byte [rcx + rdx], 1
         ret
-
+_bigadd1:
 _bigadd:
     ;rcx - dst
     ;rdx - op1
@@ -130,7 +130,7 @@ _bigmul:
         mov [rsp + 16], r9 ; sz
         mov rdx, rcx
         ; xor r10, r10 ; counter of bytes
-        mov r10, r9
+        mov r10, r9 ;possible
         shr r10, 1
     _bigmul_outer_cycle:
         xor rdi, rdi ; counter of bits
@@ -142,7 +142,7 @@ _bigmul:
         jz _bigmul_inner_end
         mov r8, [rsp]
         mov r9, [rsp + 16]
-        call _bigadd
+        call _bigadd1
         shl rbx, 1
         jc _bigmul_add_case
     _bigmul_inner_continue:
@@ -151,7 +151,7 @@ _bigmul:
     _bigmul_add_case:
         mov r8, [rsp + 8]
         mov r9, [rsp + 16]
-        call _bigadd
+        call _bigadd1
         jmp _bigmul_inner_continue
     _bigmul_inner_end:
         add r10, 8
@@ -544,6 +544,7 @@ _MNTG_POWMOD:
         push rdi
         push rbx
         push rbp
+        push r12
         mov rbp, rsp
         sub rsp, 40
         mov rax, [rcx + 32]
@@ -555,33 +556,43 @@ _MNTG_POWMOD:
         mov [rsp + 24], r8  ;op1
         mov [rsp + 32], r9  ;exp
         shr rsi, 1
-
+        xor r12, r12
     _MNTG_POWMOD_cycle:
     ;cmp counter with len, if so, jump to end
         cmp rsi, [rsp]
         jz _MNTG_POWMOD_end
     ;load the coefficient into rdi and
     ;shl 64 times
-    _MNTG_POWMOD_shl_cycle_start:
         xor rbx, rbx
         mov rcx,  [rsp + 32]
         mov rdi, [rcx + rsi]
     _MNTG_POWMOD_shl_cycle:
         cmp rbx, 64
         jz _MNTG_POWMOD_cycle_end_routine
+        inc rbx
+        shl rdi, 1
+        setc al
+        or r12b, al
+        test al, al
+        jz _MNTG_POWMOD_sq
+        jmp _MNTG_POWMOD_sqmul
     ;square
+    _MNTG_POWMOD_sq:
+        test r12, r12
+        jz _MNTG_POWMOD_shl_cycle
         mov rcx, [rsp + 8]
         mov rdx, [rsp + 16]
         mov r8, rdx
         mov r9, rdx
         call MNTG_MUL
-    ;check if the bit is set
-        inc rbx
-        shl rdi, 1
-        setc al
-        test al, al
-        jz _MNTG_POWMOD_shl_cycle
+        jmp _MNTG_POWMOD_shl_cycle
     ;if so, multiply by op1
+    _MNTG_POWMOD_sqmul:
+        mov rcx, [rsp + 8]
+        mov rdx, [rsp + 16]
+        mov r8, rdx
+        mov r9, rdx
+        call MNTG_MUL
         mov rcx, [rsp + 8]
         mov rdx, [rsp + 16]
         mov r8, rdx
@@ -593,6 +604,7 @@ _MNTG_POWMOD:
         jmp _MNTG_POWMOD_cycle
     _MNTG_POWMOD_end:
         lea rsp, [rsp + 40]
+        pop r12
         pop rbp
         pop rbx
         pop rdi

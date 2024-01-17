@@ -31,17 +31,23 @@ typedef struct {
     unsigned char* Rinv;
     unsigned char* Ninv;
     size_t length;
+    unsigned char* buf1;
+    unsigned char* buf2;
+    unsigned char* buf3;
 } MNTG;
 
 #define BIG_alloc(name, sz)\
 unsigned char name[sz]
 
-#define MNTG_palloc(name, modulus, R, Rinv, Ninv, sz)\
+#define MNTG_palloc(name, modulus, R, Rinv, Ninv, sz, b1, b2, b3)\
 BIG_alloc(modulus, sz);\
 BIG_alloc(R, sz);\
 BIG_alloc(Rinv, sz);\
 BIG_alloc(Ninv, sz);\
-MNTG name = {modulus, R, Rinv, Ninv, sz}
+BIG_alloc(b1, sz);\
+BIG_alloc(b2, sz);\
+BIG_alloc(b3, sz);\
+MNTG name = {modulus, R, Rinv, Ninv, sz, b1, b2, b3}
 
 int MNTG_setup(MNTG* in);
 int MNTG_MUL(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* op2);
