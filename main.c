@@ -10,51 +10,52 @@
 
 
 int main(){
-
+    size_t sz = 16;
+    size_t sz4 = sz>>1;
     unsigned char seed256[32];
     // unsigned char buf[128];
+    BIG_alloc(m1, sz);
+    BIG_alloc(m2, sz);
+    BIG_alloc(m3, sz);
+    MNTG_palloc(mntg,mod, p2, p2inv, negNinv, sz);
     _seed256(seed256);
-    MNTG_alloc(mntg, b1,b2,mval, p2, p2inv, negNinv, 64);
-    // unsigned char b1[64];
-    // unsigned char b2[64];
-    unsigned char n[64];
-    unsigned char dst[64];
-    _aes_prng(seed256, b1, 64);
-    _aes_prng(seed256, b2, 64);
-    _aes_prng(seed256, n, 64);
-    memset(b1, 0, 64);
-    memset(b2, 0, 64);
-    memset(n, 0, 64);
-    memset(dst, 0, 64);
-    // memcpy(b2 + 32, b1+32, 32);
-    b2[63] = 131;
-    b1[63] = 251;
-    // b2[63] = 17;
-    printf("Block 1 %p\n", b1);
-    print_block(b1);
-    print_block(b1 + 32);
-
-    printf("Block 2\n");
-    print_block(b2);
-    print_block(b2 + 32);
-
-    _store_le(b1, b1, 64);
-    _store_le(b2, b2, 64);
-
-    MNTG_in(&mntg);
-
-    printf("mval:\n");
-    pbl(mval);
-    printf("ninv:\n");
-    pbl(negNinv);
-    printf("r\n");
-    pbl(p2);
-    printf("rinv:\n");
-    pbl(p2inv);
-    // printf("q is:\n");
-    // pbl(n);
-    // printf("r is:\n");
-    // pbl(dst);
-    // printf("Finish!\n");
+    _aes_prng(seed256, m1, sz);
+    _aes_prng(seed256, m2, sz);
+    _aes_prng(seed256, mod, sz);
+    memset(m1, 0, sz>>1);
+    memset(m2, 0, sz>>1);
+    memset(m3, 0, sz);
+    memset(mod, 0, sz>>1);
+    // m1[sz -1] = 251;
+    // m2[sz -1] = 107;
+    // mod[sz - 1] = 131;
+    unsigned long long a = 0xc103f70ea9efd2ab;
+    unsigned long long b = 0x7e3ee438fb2c71eb;
+    unsigned long long c = 0x6eccd7dadc525e3f;
+    memcpy(m1 + sz4, &a, 8);
+    memcpy(m2 + sz4, &b, 8);
+    memcpy(mod + sz4, &c, 8);
+    // mod[sz -1] |= 1;
+    // _store_le(m1,m1, sz);
+    // _store_le(m2,m2, sz);
+    // _store_le(mod,mod, sz);
+    if (MNTG_setup(&mntg)){
+        printf("Bad modulo!\n");
+        return 1;
+    }
+    pbl_sz(m1, sz);
+    pbl_sz(m2, sz);
+    pbl_sz(mod, sz);
+    // _bigmul(m3, m1, m2, sz);
+    MNTG_in(&mntg, m1);
+    MNTG_in(&mntg, m2);
+    printf("montgom vals\n");
+    pbl_sz(m1, sz);
+    pbl_sz(m2, sz);
+    printf("Results:\n");
+    // MNTG_POWMOD(&mntg, m3, m1, m2);
+    MNTG_MUL(&mntg, m3, m1, m2);
+    MNTG_REDC(&mntg, m3);
+    pbl_sz(m3, sz);
     return 0;
 }

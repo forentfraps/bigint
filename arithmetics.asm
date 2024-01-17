@@ -12,6 +12,13 @@ global _bigdivmod
 global _bigneg_c
 global _bigzero
 global _bigadd2n
+
+global _bigmodr
+global _bigdivr
+
+global _MNTG_POWMOD
+
+extern MNTG_MUL
 section .text
 _load_le:
 _store_le:
@@ -51,7 +58,7 @@ _aes_prng:
     ; rdx - ptr to store random
     ; r8 - bytes len, divisibly by 16
         movups xmm1, [rcx]
-        pxor xmm0, xmm0
+        movups xmm0, [rcx + 16]
     _aes_prng_cycle:
         test r8, r8
         jz _aes_prng_end
@@ -64,6 +71,7 @@ _aes_prng:
         jmp _aes_prng_cycle
     _aes_prng_end:
         movups [rcx], xmm1
+        movups [rcx + 16], xmm0
         ret
 
 _prime_prng_fix:
@@ -121,7 +129,9 @@ _bigmul:
         mov rsi, r8 ; op2
         mov [rsp + 16], r9 ; sz
         mov rdx, rcx
-        xor r10, r10 ; counter of bytes
+        ; xor r10, r10 ; counter of bytes
+        mov r10, r9
+        shr r10, 1
     _bigmul_outer_cycle:
         xor rdi, rdi ; counter of bits
         cmp r10, [rsp + 16]
@@ -493,4 +503,98 @@ _bigzero:
         mov [rcx + rdx], rax
         jmp _bigzero_cycle
     _bigzero_end:
+        ret
+
+_bigdivr:
+    ;rcx - dst
+    ;rdx - sz
+        shr rdx, 1
+        lea r8, [rcx + rdx]
+    _bigdivr_cycle:
+        test rdx, rdx
+        jz _bigdivr_end
+        sub rdx, 8
+        mov rax, [rcx + rdx]
+        mov [r8 + rdx], rax
+        jmp _bigdivr_cycle
+    _bigdivr_end:
+        call _bigzero
+        ret
+
+_bigmodr:
+    ;rcx - dst
+    ;rdx - sz
+        shr rdx, 1
+        xor rax, rax
+    _bigmodr_cycle:
+        test rdx, rdx
+        jz _bigmodr_end
+        sub rdx, 8
+        mov [rcx + rdx], rax
+        jmp _bigmodr_cycle
+    _bigmodr_end:
+        ret
+
+_MNTG_POWMOD:
+    ;rcx - mntg struct
+    ;rdx - dst
+    ;r8 - op1
+    ;r9 - exp
+        push rsi
+        push rdi
+        push rbx
+        push rbp
+        mov rbp, rsp
+        sub rsp, 40
+        mov rax, [rcx + 32]
+        mov [rsp], rax      ;sz
+        mov [rsp + 8], rcx  ;mntg
+        mov rsi, rax
+        xor rax, rax
+        mov [rsp + 16], rdx ;dst
+        mov [rsp + 24], r8  ;op1
+        mov [rsp + 32], r9  ;exp
+        shr rsi, 1
+
+    _MNTG_POWMOD_cycle:
+    ;cmp counter with len, if so, jump to end
+        cmp rsi, [rsp]
+        jz _MNTG_POWMOD_end
+    ;load the coefficient into rdi and
+    ;shl 64 times
+    _MNTG_POWMOD_shl_cycle_start:
+        xor rbx, rbx
+        mov rcx,  [rsp + 32]
+        mov rdi, [rcx + rsi]
+    _MNTG_POWMOD_shl_cycle:
+        cmp rbx, 64
+        jz _MNTG_POWMOD_cycle_end_routine
+    ;square
+        mov rcx, [rsp + 8]
+        mov rdx, [rsp + 16]
+        mov r8, rdx
+        mov r9, rdx
+        call MNTG_MUL
+    ;check if the bit is set
+        inc rbx
+        shl rdi, 1
+        setc al
+        test al, al
+        jz _MNTG_POWMOD_shl_cycle
+    ;if so, multiply by op1
+        mov rcx, [rsp + 8]
+        mov rdx, [rsp + 16]
+        mov r8, rdx
+        mov r9, [rsp + 24]
+        call MNTG_MUL
+        jmp _MNTG_POWMOD_shl_cycle
+    _MNTG_POWMOD_cycle_end_routine:
+        add rsi, 8
+        jmp _MNTG_POWMOD_cycle
+    _MNTG_POWMOD_end:
+        lea rsp, [rsp + 40]
+        pop rbp
+        pop rbx
+        pop rdi
+        pop rsi
         ret

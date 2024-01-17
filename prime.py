@@ -59,26 +59,54 @@ def gcdExtended(a, b):
 
 class MontgomeryNumber:
     def __init__(self, value, modulus):
-        self.value = value
         self.modulus = modulus
-        self.R = 2**256  # R is a power of 2 just larger than modulus
+        self.R = 2 ** 64
         self.Rinv = pow(self.R, -1, modulus)  # Modular inverse of R modulo N
         self.Nprime = -pow(modulus, -1, self.R) % self.R  # -N^-1 mod R
 
         # Convert value to Montgomery form
-        self.montgomery_value = (self.value * self.R) % self.modulus
+        self.montgomery_value = (value * self.R) % self.modulus
+
+    def montgomery_reduce(self, T):
+        """Performs the Montgomery Reduction on T."""
+        print("value to reduce")
+        print(hex(T))
+        m = (T * self.Nprime) % self.R
+        print("m")
+        print(hex(m))
+        t = ( m * self.modulus)
+        print("multiplication")
+        print(hex(t))
+        print("addition")
+        t += T
+        print(hex(t))
+        print("t small before mod")
+        print(hex(t))
+        t >>= 64
+        print("t after modr")
+        print(hex(t))
+        if t >= self.modulus:
+            print("path is taken to reduce")
+            t -= self.modulus
+        return t
 
     def __str__(self):
-        return (f"Value: {hex(self.value)}\n"
-                f"Montgomery Value: {hex(self.montgomery_value)}\n"
-                f"Modulus: {hex(self.modulus)}\n"
-                f"R: {hex(self.R)}\n"
-                f"Rinv: {hex(self.Rinv)}\n"
-                f"Nprime: {hex(self.Nprime)}")
+        return (f"Value in Montgomery Form: {hex(self.montgomery_value)}\n")
 
+def montgomery_multiply(a, b):
+    """Multiply two Montgomery Numbers."""
+    T = a.montgomery_value * b.montgomery_value
+    print("Temp multiplication is:")
+    print(hex(T))
+
+    return a.montgomery_reduce(T)
+    # return a
 # Example usage
-montgomery_number = MontgomeryNumber(251, 131)
-print(montgomery_number)
+# m1 = MontgomeryNumber(251, 131)
+# m2 = MontgomeryNumber(115, 131)
+# print(m1)
+# print(m2)
+# print(hex(montgomery_multiply(m1, m2).montgomery_value))
 
 # Driver code
 # a = 0x57e8fa0952c6cc76ef6c4ce9d3458852348b996a31a5af158c0f2f8ab026eb31
@@ -87,3 +115,18 @@ print(montgomery_number)
 # print(hex(x))
 # print(hex(y % 2**512))
 # print(generate_prime_number(2048))
+a = 0x0000000000000000c103f70ea9efd2ab
+b = 0x00000000000000007e3ee438fb2c71eb
+c = 0x00000000000000006eccd7dadc525e3f
+
+m1 = MontgomeryNumber(a, c)
+m2 = MontgomeryNumber(b, c)
+# print (hex(pow(a, b, c)))
+print(m1)
+print(m2)
+
+m3 = montgomery_multiply(m1, m2)
+print("multiplication in montgom")
+print(hex(m3))
+
+print(hex(m1.montgomery_reduce(m3)))

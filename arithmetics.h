@@ -14,16 +14,19 @@ extern void _bigmod(unsigned char* op1dst, unsigned char* op2, size_t sz);
 extern void _bigdivmod(unsigned char* q, unsigned char* r, unsigned char* op1, unsigned char* op2, size_t sz);
 extern void _bigzero(unsigned char * dst, size_t sz);
 extern void _bigadd2n(unsigned char* dst, unsigned long long n2, size_t sz);
+extern void _bigdivr(unsigned char* dst, size_t sz);
+extern void _bigmodr(unsigned char* dst, size_t sz);
+
+
 
 int GCDE(unsigned char* a, unsigned char* b, unsigned char* ptr_x, unsigned char* ptr_y, size_t sz);
 int ModInverse(unsigned char* a, unsigned char* b, unsigned char* ptr_x, size_t sz);
 void print_block(unsigned char* b);
 void pbl(unsigned char* b);
+void pbl_sz(unsigned char* b, size_t sz);
 
 typedef struct {
-    unsigned char* value;
     unsigned char* modulus;
-    unsigned char* mval;
     unsigned char* R;
     unsigned char* Rinv;
     unsigned char* Ninv;
@@ -33,15 +36,19 @@ typedef struct {
 #define BIG_alloc(name, sz)\
 unsigned char name[sz]
 
-#define MNTG_alloc(name, value, modulus,mval, R, Rinv, Ninv, sz)\
-BIG_alloc(value, sz);\
+#define MNTG_palloc(name, modulus, R, Rinv, Ninv, sz)\
 BIG_alloc(modulus, sz);\
-BIG_alloc(mval, sz);\
 BIG_alloc(R, sz);\
 BIG_alloc(Rinv, sz);\
 BIG_alloc(Ninv, sz);\
-MNTG name = {value, modulus,mval, R, Rinv, Ninv, sz}
+MNTG name = {modulus, R, Rinv, Ninv, sz}
 
-int MNTG_in(MNTG* in);
+int MNTG_setup(MNTG* in);
+int MNTG_MUL(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* op2);
+int MNTG_REDC(MNTG* mntg, unsigned char* value);
+int MNTG_in(MNTG* mntg, unsigned char* value);
 
+
+extern void _MNTG_POWMOD(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* exp);
+int MNTG_POWMOD(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* exp);
 #endif

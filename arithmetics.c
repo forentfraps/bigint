@@ -15,6 +15,19 @@ void pbl(unsigned char* b){
     _load_le(b, b, 64);
 }
 
+void pbl_sz(unsigned char* b, size_t sz){
+    _load_le(b, b, sz);
+    for(int i = 0; i < sz; ++i){
+        printf("%02x", b[i]);
+        if ((i + 1) % 32 == 0){
+            printf("\n");
+        }
+    }
+    printf("\n\n");
+    _load_le(b, b, sz);
+    return;
+}
+
 int GCDE(unsigned char* a, unsigned char* b, unsigned char* ptr_x, unsigned char* ptr_y, unsigned long long sz){
     int gcd;
     unsigned char x1[sz];
@@ -73,19 +86,101 @@ typedef struct {
 
 
 
-int MNTG_in(MNTG* in){
+int MNTG_setup(MNTG* in){
     unsigned char* R = in->R;
     size_t sz = in->length;
     BIG_alloc(rmodn, sz);
+
     _bigzero(rmodn, sz);
-    _bigadd2n(rmodn, sz * 4, sz);
+    _bigadd2n(rmodn, sz << 2, sz);
     memcpy(R, rmodn, sz);
-    _bigmod(rmodn, in->modulus, sz);
-    ModInverse(rmodn, in->modulus, in->Rinv, sz);
-    ModInverse(in->modulus, R, in->Ninv, sz);
+    // _bigmod(rmodn, in->modulus, sz);
+    if (ModInverse(rmodn, in->modulus, in->Rinv, sz)){
+        return 1;
+    }
+    if (ModInverse(in->modulus, R, in->Ninv, sz)){
+        return 1;
+    }
     _bigneg_c(in->Ninv, sz);
     _bigadd(in->Ninv, in->Ninv, R, sz);
-    _bigzero(in->mval, sz);
-    _bigmul(in->mval, rmodn, in->value, sz);
-    _bigmod(in->mval, in->modulus, sz);
+    return 0;
 }
+
+int MNTG_in(MNTG* mntg, unsigned char* value){
+    size_t sz = mntg->length;
+    BIG_alloc(mval, sz);
+    _bigzero(mval, sz);
+    _bigmul(mval, mntg->R, value, sz);
+    _bigmod(mval, mntg->modulus, sz);
+    memcpy(value, mval, sz);
+}
+
+int MNTG_REDC(MNTG* mntg, unsigned char* value){
+    size_t sz = mntg->length;
+    BIG_alloc(m, sz);
+    BIG_alloc(mn, sz);
+    BIG_alloc(t, sz);
+    printf("Value to reduce\n");
+    pbl_sz(value, sz);
+    memcpy(t, value, sz);
+    _bigmodr(t, sz);
+    _bigzero(m, sz);
+    _bigzero(mn, sz);
+    _bigmul(m, t, mntg->Ninv, sz);
+    _bigmodr(m, sz);
+    printf("m\n");
+    pbl_sz(m, sz);
+    _bigmul(mn, mntg->modulus, m, sz);
+    printf("first multiplication\n");
+    pbl_sz(mn, sz);
+    _bigadd(value, value, mn, sz);
+    printf("addition\n");
+    pbl_sz(value, sz);
+    _bigdivr(value, sz);
+    _bigzero(value, sz >> 1);
+    printf("t small\n");
+    pbl_sz(value, sz);
+    if (_bigcmp(mntg->modulus, value, sz) != 0){
+        printf("path is taken\n");
+        memcpy(m, mntg->modulus, sz);
+        _bigneg_c(m, sz);
+        _bigadd(value, value, m, sz);
+    }
+    return 0;
+}
+
+int MNTG_MUL(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* op2){
+    size_t sz = mntg->length;
+    BIG_alloc(mul_tmp, sz);
+    _bigzero(mul_tmp, sz);
+    _bigmul(mul_tmp, op1, op2, sz);
+    printf("multiplication\n");
+    pbl_sz(mul_tmp, sz);
+    memcpy(dst, mul_tmp, sz);
+    MNTG_REDC(mntg, dst);
+    return 0;
+}
+
+int MNTG_pro(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* op2){
+    size_t sz= mntg->length;
+    BIG_alloc(t, sz);
+    BIG_alloc(m, sz);
+}
+
+int MNTG_POWMOD(MNTG* mntg, unsigned char* dst, unsigned char* op1, unsigned char* exp){
+    size_t sz = mntg->length;
+    BIG_alloc(tmp, sz);
+    unsigned long long shl;
+    _bigzero(tmp, sz);
+    tmp[sz - 1] = 1;
+    _store_le(tmp, tmp, sz);
+    MNTG_in(mntg, tmp);
+    _MNTG_POWMOD(mntg, tmp, op1, exp);
+    memcpy(dst, tmp, sz);
+    return 0;
+}
+
+int POWMOD(unsigned char* dst, unsigned char* op1, unsigned char* exp){
+
+}
+
